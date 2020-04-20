@@ -6,7 +6,12 @@ namespace sinri\ark\sftp;
 
 use Exception;
 
-class ArkSFTPKit
+/**
+ * Class ArkSFTPKit
+ * @package sinri\ark\sftp
+ * This class is migrated from Enoch
+ */
+class ArkSFTPKitFromEnoch
 {
     protected $strServer = "";
     protected $strServerPort = "22";
