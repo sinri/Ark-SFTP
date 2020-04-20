@@ -8,16 +8,24 @@ use Exception;
 
 class ArkSFTP
 {
+    /**
+     * @var ArkSSH2
+     */
+    protected $parentArkSSH2Instance;
+    /**
+     * @var resource
+     */
     protected $sftpConnection;
 
     /**
-     * @param resource $connection
+     * @param ArkSSH2 $arkSS2Instance
      * @return $this
      * @throws Exception
      */
-    public function connect($connection)
+    public function connect($arkSS2Instance)
     {
-        $this->sftpConnection = ssh2_sftp($connection);
+        $this->parentArkSSH2Instance = $arkSS2Instance;
+        $this->sftpConnection = ssh2_sftp($this->parentArkSSH2Instance->getConnection());
         if ($this->sftpConnection === false) {
             throw new Exception("Cannot establish SFTP connection via SSH2 connection");
         }
@@ -94,7 +102,7 @@ class ArkSFTP
 
     /**
      * @param string $remoteDir
-     * @param callable $callback function(resource $sftpConnection,string $remoteParentDir,string $remoteTargetItem,bool $isDir):void throws \Exception
+     * @param callable $callback function(ArkSFTP $sftp,string $remoteParentDir,string $remoteTargetItem,bool $isDir):void throws \Exception
      * @throws Exception
      */
     public function traversalOnRemoteDirectory($remoteDir, $callback)
@@ -111,7 +119,7 @@ class ArkSFTP
 
             // you should check if it is a dir or file in callback
             $isDir = is_dir('ssh2.sftp://' . intval($this->sftpConnection) . $remoteDir . DIRECTORY_SEPARATOR . $file_name);
-            call_user_func_array($callback, [$this->sftpConnection, $remoteDir, $file_name, $isDir]);
+            call_user_func_array($callback, [$this, $remoteDir, $file_name, $isDir]);
 
 //            Another Design, not so flexible
 //            if(is_dir('ssh2.sftp://' . intval($this->sftpConnection) . $remoteDir.DIRECTORY_SEPARATOR.$file_name)){

@@ -79,16 +79,16 @@ class ArkSSH2
     protected $connection;
 
     /**
+     * @param string $username
+     * @param string $password
      * @param string $host
      * @param int $port
-     * @param null|array $methods
-     * @param null|array $callbacks
      * @return ArkSSH2
      * @throws Exception
      */
-    public static function buildSSH2($host, $port = 22, $methods = null, $callbacks = null)
+    public static function createConnectionWithPassword($username, $password, $host, $port = 22)
     {
-        return (new ArkSSH2())->connect($host, $port, $methods, $callbacks);
+        return (new ArkSSH2())->connect($host, $port)->authWithPassword($username, $password);
     }
 
     /**
@@ -313,5 +313,14 @@ class ArkSSH2
             throw new Exception("Cannot disconnect from server");
         }
         return $this;
+    }
+
+    /**
+     * @return ArkSFTP
+     * @throws Exception
+     */
+    public function createSFTPInstance()
+    {
+        return (new ArkSFTP())->connect($this);
     }
 }
