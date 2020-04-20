@@ -18,6 +18,22 @@ class ArkSFTP
     protected $sftpConnection;
 
     /**
+     * @return ArkSSH2
+     */
+    public function getParentArkSSH2Instance()
+    {
+        return $this->parentArkSSH2Instance;
+    }
+
+    /**
+     * @return resource
+     */
+    public function getSftpConnection()
+    {
+        return $this->sftpConnection;
+    }
+
+    /**
      * @param ArkSSH2 $arkSS2Instance
      * @return $this
      * @throws Exception
