@@ -83,6 +83,23 @@ class ArkSFTP
     }
 
     /**
+     * Ensure there is a(n empty) file.
+     * @param string $remotePath
+     * @return $this
+     * @throws Exception
+     * @since 0.1.2
+     */
+    public function touchFileOnSFTP($remotePath)
+    {
+        $sftpStream = fopen('ssh2.sftp://' . intval($this->sftpConnection) . $remotePath, 'a');
+        if (!$sftpStream) {
+            throw new Exception("Cannot open remote file");
+        }
+        fclose($sftpStream);
+        return $this;
+    }
+
+    /**
      * @param string $remotePath
      * @param string $localPath
      * @return $this
