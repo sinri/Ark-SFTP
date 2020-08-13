@@ -124,18 +124,30 @@ class ArkSFTP
             throw new Exception("Cannot open local file");
         }
 
-        while (!feof($sftpStream)) {
-            $contents = fread($sftpStream, 8192);
-            $partialWritten = fwrite($localFile, $contents);
-            if (!$partialWritten) {
-                fclose($sftpStream);
-                fclose($localFile);
-                throw new Exception("Failed in writing partial data into local path");
+        try {
+            while (!feof($sftpStream)) {
+                $contents = fread($sftpStream, 8192);
+                if ($contents === false) {
+                    throw new Exception('Read an SFTP stream but failed');
+                }
+                if (strlen($contents) === 0) {
+                    // Should here be await?
+                    throw new Exception('Read an SFTP stream but empty got');
+                }
+                $partialWritten = fwrite($localFile, $contents);
+                if ($partialWritten === false) {
+                    throw new Exception("Failed in writing partial data into local path");
+                }
+                if ($partialWritten === 0) {
+                    throw new Exception("Tried to write partial data into local path but none written");
+                }
             }
+        } catch (Exception $exception) {
+            throw $exception;
+        } finally {
+            fclose($sftpStream);
+            fclose($localFile);
         }
-
-        fclose($sftpStream);
-        fclose($localFile);
 
         return $this;
     }
