@@ -109,10 +109,11 @@ class ArkSFTP
     /**
      * @param string $remotePath
      * @param string $localPath
+     * @param int $waitForEOFLimitTime the seconds before waiting for EOF with empty input. Zero for unlimited wait.
      * @return $this
      * @throws Exception
      */
-    public function transcribeFileFromSFTP($remotePath, $localPath)
+    public function transcribeFileFromSFTP($remotePath, $localPath, $waitForEOFLimitTime = 0)
     {
         $sftpStream = fopen('ssh2.sftp://' . intval($this->sftpConnection) . $remotePath, 'rb');
         if (!$sftpStream) {
@@ -125,14 +126,24 @@ class ArkSFTP
         }
 
         try {
+            $startWaitingForEOFTime = 0;
             while (!feof($sftpStream)) {
                 $contents = fread($sftpStream, 8192);
                 if ($contents === false) {
                     throw new Exception('Read an SFTP stream but failed');
                 }
                 if (strlen($contents) === 0) {
-                    // Should here be await?
-                    throw new Exception('Read an SFTP stream but empty got');
+                    if ($waitForEOFLimitTime > 0) {
+                        if ($startWaitingForEOFTime === 0) {
+                            $startWaitingForEOFTime = microtime(true);
+                        }
+                        $currentWaitingForEOFTime = microtime(true);
+                        if ($currentWaitingForEOFTime - $startWaitingForEOFTime > $waitForEOFLimitTime) {
+                            break;
+                        }
+                    }
+                    // it seems very dangerous... so above limitation is designed
+                    continue;
                 }
                 $partialWritten = fwrite($localFile, $contents);
                 if ($partialWritten === false) {
