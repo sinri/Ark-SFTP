@@ -86,7 +86,7 @@ class ArkSSH2
      * @return ArkSSH2
      * @throws Exception
      */
-    public static function createConnectionWithPassword($username, $password, $host, $port = 22)
+    public static function createConnectionWithPassword(string $username, string $password, string $host, int $port = 22)
     {
         return (new ArkSSH2())->connect($host, $port)->authWithPassword($username, $password);
     }
@@ -114,7 +114,7 @@ class ArkSSH2
      * @return ArkSSH2
      * @throws Exception
      */
-    public function connect($host, $port = 22, $methods = null, $callbacks = null)
+    public function connect(string $host, int $port = 22, $methods = null, $callbacks = null)
     {
         $this->connection = ssh2_connect($host, $port, $methods, $callbacks);
         if (!$this->connection) {
@@ -148,10 +148,10 @@ class ArkSSH2
      * @throws Exception
      * NOTE: ssh2_auth_hostbased_file() requires libssh2 >= 0.7 and PHP/SSH2 >= 0.7
      */
-    public function authWithHostBasedFile($username,
-                                          $hostname,
-                                          $publicKeyFile,
-                                          $privateKeyFile,
+    public function authWithHostBasedFile(string $username,
+                                          string $hostname,
+                                          string $publicKeyFile,
+                                          string $privateKeyFile,
                                           $passPhrase = null,
                                           $localUsername = null)
     {
@@ -175,7 +175,7 @@ class ArkSSH2
      * @param string[]|true $availableAuthMethods TRUE for connection established, or available methods fetched
      * @return $this
      */
-    public function authWithNone($username, &$availableAuthMethods = null)
+    public function authWithNone(string $username, &$availableAuthMethods = null)
     {
         $availableAuthMethods = ssh2_auth_none($this->connection, $username);
         return $this;
@@ -187,7 +187,7 @@ class ArkSSH2
      * @return $this
      * @throws Exception
      */
-    public function authWithPassword($username, $password)
+    public function authWithPassword(string $username, string $password)
     {
         $passed = ssh2_auth_password($this->connection, $username, $password);
         if (!$passed) {
@@ -204,7 +204,7 @@ class ArkSSH2
      * @return $this
      * @throws Exception
      */
-    public function authWithPublicKeyFile($username, $publicKeyFile, $privateKeyFile, $passPhrase = null)
+    public function authWithPublicKeyFile(string $username, string $publicKeyFile, string $privateKeyFile, $passPhrase = null)
     {
         $passed = ssh2_auth_pubkey_file($this->connection, $username, $publicKeyFile, $privateKeyFile, $passPhrase);
         if (!$passed) {
@@ -223,7 +223,7 @@ class ArkSSH2
      * @param int $width_height_type SSH2_TERM_UNIT_CHARS or SSH2_TERM_UNIT_PIXELS.
      * @return false|resource Returns a stream on success or FALSE on failure.
      */
-    public function executeCommand($command, $pty = null, $env = null, $width = 80, $height = 25, $width_height_type = SSH2_TERM_UNIT_CHARS)
+    public function executeCommand(string $command, $pty = null, $env = null, $width = 80, $height = 25, $width_height_type = SSH2_TERM_UNIT_CHARS)
     {
         return ssh2_exec($this->connection, $command, $pty, $env, $width, $height, $width_height_type);
     }
@@ -235,7 +235,7 @@ class ArkSSH2
      * @param int $port
      * @return resource
      */
-    public function createTunnel($host, $port)
+    public function createTunnel(string $host, int $port)
     {
         return ssh2_tunnel($this->connection, $host, $port);
     }
@@ -260,7 +260,7 @@ class ArkSSH2
      * @param int $createMode
      * @return bool
      */
-    public function scpSend($localPath, $remotePath, $createMode = 0644)
+    public function scpSend(string $localPath, string $remotePath, $createMode = 0644)
     {
         return ssh2_scp_send($this->connection, $localPath, $remotePath, $createMode);
     }
@@ -271,7 +271,7 @@ class ArkSSH2
      * @param string $localPath
      * @return bool
      */
-    public function scpReceive($remotePath, $localPath)
+    public function scpReceive(string $remotePath, string $localPath)
     {
         return ssh2_scp_recv($this->connection, $remotePath, $localPath);
     }
@@ -284,7 +284,7 @@ class ArkSSH2
      * @param int $streamId
      * @return resource
      */
-    public function fetchStream($streamId)
+    public function fetchStream(int $streamId)
     {
         return ssh2_fetch_stream($this->connection, $streamId);
     }

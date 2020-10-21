@@ -38,7 +38,7 @@ class ArkSFTP
      * @return $this
      * @throws Exception
      */
-    public function connect($arkSS2Instance)
+    public function connect(ArkSSH2 $arkSS2Instance)
     {
         $this->parentArkSSH2Instance = $arkSS2Instance;
         $this->sftpConnection = ssh2_sftp($this->parentArkSSH2Instance->getConnection());
@@ -54,7 +54,7 @@ class ArkSFTP
      * @return $this
      * @throws Exception
      */
-    public function transcribeFileToSFTP($localPath, $remotePath)
+    public function transcribeFileToSFTP(string $localPath, string $remotePath)
     {
         $localFile = fopen($localPath, 'rb');
         if (!$localFile) {
@@ -83,13 +83,23 @@ class ArkSFTP
     }
 
     /**
+     * @param string $remotePath
+     * @return bool
+     * @since 0.1.6
+     */
+    public function checkFileExistsOnSFTP(string $remotePath)
+    {
+        return file_exists('ssh2.sftp://' . intval($this->sftpConnection) . $remotePath);
+    }
+
+    /**
      * Ensure there is a(n empty) file.
      * @param string $remotePath
      * @return $this
      * @throws Exception
      * @since 0.1.3
      */
-    public function touchFileOnSFTP($remotePath)
+    public function touchFileOnSFTP(string $remotePath)
     {
         try {
             $sftpStream = @fopen('ssh2.sftp://' . intval($this->sftpConnection) . $remotePath, 'a');
@@ -113,7 +123,7 @@ class ArkSFTP
      * @return $this
      * @throws Exception
      */
-    public function transcribeFileFromSFTP($remotePath, $localPath, $waitForEOFLimitTime = 0)
+    public function transcribeFileFromSFTP(string $remotePath, string $localPath, int $waitForEOFLimitTime = 0)
     {
         $sftpStream = fopen('ssh2.sftp://' . intval($this->sftpConnection) . $remotePath, 'rb');
         if (!$sftpStream) {
@@ -168,7 +178,7 @@ class ArkSFTP
      * @param callable $callback function(ArkSFTP $sftp,string $remoteParentDir,string $remoteTargetItem,bool $isDir):void throws \Exception
      * @throws Exception
      */
-    public function traversalOnRemoteDirectory($remoteDir, $callback)
+    public function traversalOnRemoteDirectory(string $remoteDir, $callback)
     {
         $handler = opendir('ssh2.sftp://' . intval($this->sftpConnection) . $remoteDir);
         if (!$handler) {
@@ -199,7 +209,7 @@ class ArkSFTP
      * @param string $remotePath
      * @return array
      */
-    public function getRemoteFileState($remotePath)
+    public function getRemoteFileState(string $remotePath)
     {
         return ssh2_sftp_stat($this->sftpConnection, $remotePath);
     }
@@ -209,7 +219,7 @@ class ArkSFTP
      * @param string $remotePath Path to the remote symbolic link.
      * @return array
      */
-    public function getRemoteSymlinkState($remotePath)
+    public function getRemoteSymlinkState(string $remotePath)
     {
         return ssh2_sftp_lstat($this->sftpConnection, $remotePath);
     }
@@ -228,7 +238,7 @@ class ArkSFTP
      * @param string $remotePath
      * @return bool
      */
-    public function removeRemoteFile($remotePath)
+    public function removeRemoteFile(string $remotePath)
     {
         return ssh2_sftp_unlink($this->sftpConnection, $remotePath);
     }
@@ -237,7 +247,7 @@ class ArkSFTP
      * @param string $remotePath
      * @return bool
      */
-    public function removeRemoteDir($remotePath)
+    public function removeRemoteDir(string $remotePath)
     {
         return ssh2_sftp_rmdir($this->sftpConnection, $remotePath);
     }
@@ -247,7 +257,7 @@ class ArkSFTP
      * @param string $to
      * @return bool
      */
-    public function renameRemoteItem($from, $to)
+    public function renameRemoteItem(string $from, string $to)
     {
         return ssh2_sftp_rename($this->sftpConnection, $from, $to);
     }
@@ -257,7 +267,7 @@ class ArkSFTP
      * @param string $remotePath
      * @return string
      */
-    public function getRealPathOfRemoteFile($remotePath)
+    public function getRealPathOfRemoteFile(string $remotePath)
     {
         return ssh2_sftp_realpath($this->sftpConnection, $remotePath);
     }
@@ -266,7 +276,7 @@ class ArkSFTP
      * @param string $remoteLink
      * @return string
      */
-    public function getSymlinkTarget($remoteLink)
+    public function getSymlinkTarget(string $remoteLink)
     {
         return ssh2_sftp_readlink($this->sftpConnection, $remoteLink);
     }
@@ -277,7 +287,7 @@ class ArkSFTP
      * @param string $link
      * @return bool
      */
-    public function createRemoteSymlink($target, $link)
+    public function createRemoteSymlink(string $target, string $link)
     {
         return ssh2_sftp_symlink($this->sftpConnection, $target, $link);
     }
@@ -288,7 +298,7 @@ class ArkSFTP
      * @param bool $recursive
      * @return bool
      */
-    public function createRemoteDirectory($dirname, $mode = 0777, $recursive = false)
+    public function createRemoteDirectory(string $dirname, int $mode = 0777, bool $recursive = false)
     {
         return ssh2_sftp_mkdir($this->sftpConnection, $dirname, $mode, $recursive);
     }
