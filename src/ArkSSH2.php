@@ -92,6 +92,35 @@ class ArkSSH2
     }
 
     /**
+     * @param string $host
+     * @param string $username
+     * @param string $publicKeyFilePath
+     * @param string $privateKeyFilePath
+     * @param int $port
+     * @param string|null $passPhrase
+     * @return ArkSSH2
+     * @throws Exception
+     * @since 0.1.7
+     */
+    public static function createConnectionWithRSAKeyPair(
+        string $host,
+        string $username,
+        string $publicKeyFilePath,
+        string $privateKeyFilePath,
+        int $port = 22,
+        $passPhrase = null
+    )
+    {
+        return (new ArkSSH2())->connect($host, $port)
+            ->authWithPublicKeyFile(
+                $username,
+                $publicKeyFilePath,
+                $privateKeyFilePath,
+                $passPhrase
+            );
+    }
+
+    /**
      * ArkSSH2 constructor.
      * If connection given, use it directly.
      * @param null|resource $connection
