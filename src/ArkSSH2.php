@@ -4,7 +4,7 @@
 namespace sinri\ark\sftp;
 
 
-use Exception;
+use sinri\ark\sftp\exception\ArkSSH2Exception;
 
 class ArkSSH2
 {
@@ -79,16 +79,58 @@ class ArkSSH2
     protected $connection;
 
     /**
+     * ArkSSH2 constructor.
+     * If connection given, use it directly.
+     * @param null|resource $connection
+     */
+    public function __construct($connection = null)
+    {
+        $this->connection = $connection;
+    }
+
+    /**
      * @param string $username
      * @param string $password
      * @param string $host
      * @param int $port
      * @return ArkSSH2
-     * @throws Exception
+     * @throws ArkSSH2Exception
      */
-    public static function createConnectionWithPassword(string $username, string $password, string $host, int $port = 22)
+    public static function createConnectionWithPassword(string $username, string $password, string $host, int $port = 22): ArkSSH2
     {
         return (new ArkSSH2())->connect($host, $port)->authWithPassword($username, $password);
+    }
+
+    /**
+     * @param string $username
+     * @param string $password
+     * @return $this
+     * @throws ArkSSH2Exception when auth with password failed
+     */
+    public function authWithPassword(string $username, string $password): ArkSSH2
+    {
+        $passed = ssh2_auth_password($this->connection, $username, $password);
+        if (!$passed) {
+            throw new ArkSSH2Exception("Cannot auth with password");
+        }
+        return $this;
+    }
+
+    /**
+     * @param string $host
+     * @param int $port
+     * @param array|null $methods
+     * @param array|null $callbacks [CONNECTION_CALLBACK_KEY=>CALLBACK]
+     * @return ArkSSH2
+     * @throws ArkSSH2Exception when connection fails
+     */
+    public function connect(string $host, int $port = 22, array $methods = null, array $callbacks = null): ArkSSH2
+    {
+        $this->connection = ssh2_connect($host, $port, $methods, $callbacks);
+        if (!$this->connection) {
+            throw new ArkSSH2Exception("Cannot connect to server");
+        }
+        return $this;
     }
 
     /**
@@ -99,7 +141,7 @@ class ArkSSH2
      * @param int $port
      * @param string|null $passPhrase
      * @return ArkSSH2
-     * @throws Exception
+     * @throws ArkSSH2Exception
      * @since 0.1.7
      */
     public static function createConnectionWithRSAKeyPair(
@@ -107,9 +149,9 @@ class ArkSSH2
         string $username,
         string $publicKeyFilePath,
         string $privateKeyFilePath,
-        int $port = 22,
-        $passPhrase = null
-    )
+        int    $port = 22,
+        string $passPhrase = null
+    ): ArkSSH2
     {
         return (new ArkSSH2())->connect($host, $port)
             ->authWithPublicKeyFile(
@@ -121,13 +163,20 @@ class ArkSSH2
     }
 
     /**
-     * ArkSSH2 constructor.
-     * If connection given, use it directly.
-     * @param null|resource $connection
+     * @param string $username
+     * @param string $publicKeyFile The public key file needs to be in OpenSSH's format. It should look something like: `ssh-rsa AAAAB3NzaC1yc2EAAA....NX6sqSnHA8= rsa-key-20121110`
+     * @param string $privateKeyFile
+     * @param string|null $passPhrase
+     * @return $this
+     * @throws ArkSSH2Exception
      */
-    public function __construct($connection = null)
+    public function authWithPublicKeyFile(string $username, string $publicKeyFile, string $privateKeyFile, string $passPhrase = null): ArkSSH2
     {
-        $this->connection = $connection;
+        $passed = ssh2_auth_pubkey_file($this->connection, $username, $publicKeyFile, $privateKeyFile, $passPhrase);
+        if (!$passed) {
+            throw new ArkSSH2Exception("Cannot auth with public key");
+        }
+        return $this;
     }
 
     public function getConnection()
@@ -136,32 +185,15 @@ class ArkSSH2
     }
 
     /**
-     * @param string $host
-     * @param int $port
-     * @param null|array $methods
-     * @param null|array $callbacks [CONNECTION_CALLBACK_KEY=>CALLBACK]
-     * @return ArkSSH2
-     * @throws Exception
-     */
-    public function connect(string $host, int $port = 22, $methods = null, $callbacks = null)
-    {
-        $this->connection = ssh2_connect($host, $port, $methods, $callbacks);
-        if (!$this->connection) {
-            throw new Exception("Cannot connect to server");
-        }
-        return $this;
-    }
-
-    /**
      * @param string $username
      * @return $this
-     * @throws Exception
+     * @throws ArkSSH2Exception
      */
-    public function authWithAgent(string $username)
+    public function authWithAgent(string $username): ArkSSH2
     {
         $passed = ssh2_auth_agent($this->connection, $username);
         if (!$passed) {
-            throw new Exception("Cannot auth with agent");
+            throw new ArkSSH2Exception("Cannot auth with agent");
         }
         return $this;
     }
@@ -174,15 +206,17 @@ class ArkSSH2
      * @param string|null $passPhrase If $privateKeyFile is encrypted (which it should be), the passphrase must be provided.
      * @param string|null $localUsername If $localUsername is omitted, then the value for $username will be used for it.
      * @return $this
-     * @throws Exception
      * NOTE: ssh2_auth_hostbased_file() requires libssh2 >= 0.7 and PHP/SSH2 >= 0.7
+     * @throws ArkSSH2Exception
      */
-    public function authWithHostBasedFile(string $username,
-                                          string $hostname,
-                                          string $publicKeyFile,
-                                          string $privateKeyFile,
-                                          $passPhrase = null,
-                                          $localUsername = null)
+    public function authWithHostBasedFile(
+        string $username,
+        string $hostname,
+        string $publicKeyFile,
+        string $privateKeyFile,
+        string $passPhrase = null,
+        string $localUsername = null
+    ): ArkSSH2
     {
         $passed = ssh2_auth_hostbased_file(
             $this->connection,
@@ -194,67 +228,47 @@ class ArkSSH2
             $localUsername
         );
         if (!$passed) {
-            throw new Exception("Cannot auth with host based file");
+            throw new ArkSSH2Exception("Cannot auth with host based file");
         }
         return $this;
     }
 
     /**
      * @param string $username
-     * @param string[]|true $availableAuthMethods TRUE for connection established, or available methods fetched
+     * @param string[]|null $availableAuthMethods TRUE for connection established, or available methods fetched
      * @return $this
      */
-    public function authWithNone(string $username, &$availableAuthMethods = null)
+    public function authWithNone(string $username, array &$availableAuthMethods = null): ArkSSH2
     {
         $availableAuthMethods = ssh2_auth_none($this->connection, $username);
         return $this;
     }
 
     /**
-     * @param string $username
-     * @param string $password
-     * @return $this
-     * @throws Exception
-     */
-    public function authWithPassword(string $username, string $password)
-    {
-        $passed = ssh2_auth_password($this->connection, $username, $password);
-        if (!$passed) {
-            throw new Exception("Cannot auth with password");
-        }
-        return $this;
-    }
-
-    /**
-     * @param string $username
-     * @param string $publicKeyFile The public key file needs to be in OpenSSH's format. It should look something like: `ssh-rsa AAAAB3NzaC1yc2EAAA....NX6sqSnHA8= rsa-key-20121110`
-     * @param string $privateKeyFile
-     * @param null|string $passPhrase
-     * @return $this
-     * @throws Exception
-     */
-    public function authWithPublicKeyFile(string $username, string $publicKeyFile, string $privateKeyFile, $passPhrase = null)
-    {
-        $passed = ssh2_auth_pubkey_file($this->connection, $username, $publicKeyFile, $privateKeyFile, $passPhrase);
-        if (!$passed) {
-            throw new Exception("Cannot auth with public key");
-        }
-        return $this;
-    }
-
-    /**
      * Execute a command at the remote end and allocate a channel for it.
      * @param string $command
-     * @param null|string $pty You should pass a pty emulation name ("vt102", "ansi", etc...) if you want to emulate a pty, or NULL if you don't.
-     * @param null|array $env may be passed as an associative array of name/value pairs to set in the target environment.
+     * @param string|null $pty You should pass a pty emulation name ("vt102", "ansi", etc...) if you want to emulate a pty, or NULL if you don't.
+     * @param array|null $env may be passed as an associative array of name/value pairs to set in the target environment.
      * @param int $width Width of the virtual terminal.
      * @param int $height Height of the virtual terminal.
      * @param int $width_height_type SSH2_TERM_UNIT_CHARS or SSH2_TERM_UNIT_PIXELS.
-     * @return false|resource Returns a stream on success or FALSE on failure.
+     * @return resource Returns a stream on success or FALSE on failure.
+     * @throws ArkSSH2Exception
      */
-    public function executeCommand(string $command, $pty = null, $env = null, $width = 80, $height = 25, $width_height_type = SSH2_TERM_UNIT_CHARS)
+    public function executeCommand(
+        string $command,
+        string $pty = null,
+        array  $env = null,
+        int    $width = 80,
+        int    $height = 25,
+        int    $width_height_type = SSH2_TERM_UNIT_CHARS
+    )
     {
-        return ssh2_exec($this->connection, $command, $pty, $env, $width, $height, $width_height_type);
+        $executedResultStream = ssh2_exec($this->connection, $command, $pty, $env, $width, $height, $width_height_type);
+        if ($executedResultStream === false) {
+            throw new ArkSSH2Exception("failed to execute command");
+        }
+        return $executedResultStream;
     }
 
     /**
@@ -277,7 +291,13 @@ class ArkSSH2
      * @param int $width_height_type SSH2_TERM_UNIT_CHARS or SSH2_TERM_UNIT_PIXELS
      * @return resource
      */
-    public function createShell($term_type = 'vanilla', $env = null, $width = 80, $height = 25, $width_height_type = SSH2_TERM_UNIT_CHARS)
+    public function createShell(
+        string $term_type = 'vanilla',
+        array  $env = null,
+        int    $width = 80,
+        int    $height = 25,
+        int    $width_height_type = SSH2_TERM_UNIT_CHARS
+    )
     {
         return ssh2_shell($this->connection, $term_type, $env, $width, $height, $width_height_type);
     }
@@ -289,7 +309,7 @@ class ArkSSH2
      * @param int $createMode
      * @return bool
      */
-    public function scpSend(string $localPath, string $remotePath, $createMode = 0644)
+    public function scpSend(string $localPath, string $remotePath, int $createMode = 0644): bool
     {
         return ssh2_scp_send($this->connection, $localPath, $remotePath, $createMode);
     }
@@ -300,22 +320,9 @@ class ArkSSH2
      * @param string $localPath
      * @return bool
      */
-    public function scpReceive(string $remotePath, string $localPath)
+    public function scpReceive(string $remotePath, string $localPath): bool
     {
         return ssh2_scp_recv($this->connection, $remotePath, $localPath);
-    }
-
-    /**
-     * Fetches an alternate substream associated with an SSH2 channel stream.
-     * The SSH2 protocol currently defines only one substream, STDERR,
-     * which has a substream ID of SSH2_STREAM_STDERR (defined as 1).
-     *
-     * @param int $streamId
-     * @return resource
-     */
-    public function fetchStream(int $streamId)
-    {
-        return ssh2_fetch_stream($this->connection, $streamId);
     }
 
     /**
@@ -332,23 +339,36 @@ class ArkSSH2
     }
 
     /**
-     * @return $this
-     * @throws Exception
+     * Fetches an alternate sub stream associated with an SSH2 channel stream.
+     * The SSH2 protocol currently defines only one sub stream, STDERR,
+     * which has a sub stream ID of SSH2_STREAM_STDERR (defined as 1).
+     *
+     * @param int $streamId
+     * @return resource
      */
-    public function disconnect()
+    public function fetchStream(int $streamId)
+    {
+        return ssh2_fetch_stream($this->connection, $streamId);
+    }
+
+    /**
+     * @return $this
+     * @throws ArkSSH2Exception
+     */
+    public function disconnect(): ArkSSH2
     {
         $closed = ssh2_disconnect($this->connection);
         if (!$closed) {
-            throw new Exception("Cannot disconnect from server");
+            throw new ArkSSH2Exception("Cannot disconnect from server");
         }
         return $this;
     }
 
     /**
      * @return ArkSFTP
-     * @throws Exception
+     * @throws exception\ArkSFTPException
      */
-    public function createSFTPInstance()
+    public function createSFTPInstance(): ArkSFTP
     {
         return (new ArkSFTP())->connect($this);
     }

@@ -4,7 +4,7 @@
 namespace sinri\ark\sftp;
 
 
-use Exception;
+use sinri\ark\sftp\exception\ArkSFTPException;
 
 class ArkSFTP
 {
@@ -20,7 +20,7 @@ class ArkSFTP
     /**
      * @return ArkSSH2
      */
-    public function getParentArkSSH2Instance()
+    public function getParentArkSSH2Instance(): ArkSSH2
     {
         return $this->parentArkSSH2Instance;
     }
@@ -36,14 +36,14 @@ class ArkSFTP
     /**
      * @param ArkSSH2 $arkSS2Instance
      * @return $this
-     * @throws Exception
+     * @throws ArkSFTPException
      */
-    public function connect(ArkSSH2 $arkSS2Instance)
+    public function connect(ArkSSH2 $arkSS2Instance): ArkSFTP
     {
         $this->parentArkSSH2Instance = $arkSS2Instance;
         $this->sftpConnection = ssh2_sftp($this->parentArkSSH2Instance->getConnection());
         if ($this->sftpConnection === false) {
-            throw new Exception("Cannot establish SFTP connection via SSH2 connection");
+            throw new ArkSFTPException("Cannot establish SFTP connection via SSH2 connection");
         }
         return $this;
     }
@@ -52,32 +52,32 @@ class ArkSFTP
      * @param string $localPath
      * @param string $remotePath
      * @return $this
-     * @throws Exception
+     * @throws ArkSFTPException
      */
-    public function transcribeFileToSFTP(string $localPath, string $remotePath)
+    public function transcribeFileToSFTP(string $localPath, string $remotePath): ArkSFTP
     {
-        $localFile = fopen($localPath, 'rb');
+        $localFile = @fopen($localPath, 'rb');
         if (!$localFile) {
-            throw new Exception("Cannot open local file");
+            throw new ArkSFTPException("Cannot open local file to read in binary safe mode: " . $localPath);
         }
-        $sftpStream = fopen('ssh2.sftp://' . intval($this->sftpConnection) . $remotePath, 'wb');
+        $sftpStream = @fopen('ssh2.sftp://' . intval($this->sftpConnection) . $remotePath, 'wb');
         if (!$sftpStream) {
             fclose($localFile);
-            throw new Exception("Cannot open remote file");
+            throw new ArkSFTPException("Cannot open remote file to write in binary safe mode: " . $remotePath);
         }
 
         while (!feof($localFile)) {
-            $contents = fread($localFile, 8192);
-            $partialWritten = fwrite($sftpStream, $contents);
+            $contents = @fread($localFile, 8192);
+            $partialWritten = @fwrite($sftpStream, $contents);
             if (!$partialWritten) {
                 fclose($sftpStream);
                 fclose($localFile);
-                throw new Exception("Failed in writing partial data into remote path");
+                throw new ArkSFTPException("Failed in writing partial data from [$localPath] into remote path [$remotePath]");
             }
         }
 
-        fclose($sftpStream);
-        fclose($localFile);
+        @fclose($sftpStream);
+        @fclose($localFile);
 
         return $this;
     }
@@ -87,7 +87,7 @@ class ArkSFTP
      * @return bool
      * @since 0.1.6
      */
-    public function checkFileExistsOnSFTP(string $remotePath)
+    public function checkFileExistsOnSFTP(string $remotePath): bool
     {
         return file_exists('ssh2.sftp://' . intval($this->sftpConnection) . $remotePath);
     }
@@ -96,23 +96,23 @@ class ArkSFTP
      * Ensure there is a(n empty) file.
      * @param string $remotePath
      * @return $this
-     * @throws Exception
+     * @throws ArkSFTPException
      * @since 0.1.3
      */
-    public function touchFileOnSFTP(string $remotePath)
+    public function touchFileOnSFTP(string $remotePath): ArkSFTP
     {
         try {
             $sftpStream = @fopen('ssh2.sftp://' . intval($this->sftpConnection) . $remotePath, 'a');
             if (!$sftpStream) {
-                throw new Exception("cannot open existed remote file");
+                throw new ArkSFTPException("cannot open existed remote file in append mode: " . $remotePath);
             }
-        } catch (Exception $exception) {
+        } catch (ArkSFTPException $exception) {
             $sftpStream = @fopen('ssh2.sftp://' . intval($this->sftpConnection) . $remotePath, 'w');
             if (!$sftpStream) {
-                throw new Exception("cannot create empty remote file and " . $exception->getMessage());
+                throw new ArkSFTPException("cannot create empty remote file as well as " . $exception->getMessage());
             }
         }
-        fclose($sftpStream);
+        @fclose($sftpStream);
         return $this;
     }
 
@@ -121,26 +121,26 @@ class ArkSFTP
      * @param string $localPath
      * @param int $waitForEOFLimitTime the seconds before waiting for EOF with empty input. Zero for unlimited wait.
      * @return $this
-     * @throws Exception
+     * @throws ArkSFTPException
      */
-    public function transcribeFileFromSFTP(string $remotePath, string $localPath, int $waitForEOFLimitTime = 0)
+    public function transcribeFileFromSFTP(string $remotePath, string $localPath, int $waitForEOFLimitTime = 0): ArkSFTP
     {
-        $sftpStream = fopen('ssh2.sftp://' . intval($this->sftpConnection) . $remotePath, 'rb');
+        $sftpStream = @fopen('ssh2.sftp://' . intval($this->sftpConnection) . $remotePath, 'rb');
         if (!$sftpStream) {
-            throw new Exception("Cannot open remote file");
+            throw new ArkSFTPException("Cannot open remote file to read in binary safe mode: " . $remotePath);
         }
-        $localFile = fopen($localPath, 'wb');
+        $localFile = @fopen($localPath, 'wb');
         if (!$localFile) {
-            fclose($sftpStream);
-            throw new Exception("Cannot open local file");
+            @fclose($sftpStream);
+            throw new ArkSFTPException("Cannot open local file to write in binary safe mode: " . $localPath);
         }
 
         try {
             $startWaitingForEOFTime = 0;
             while (!feof($sftpStream)) {
-                $contents = fread($sftpStream, 8192);
+                $contents = @fread($sftpStream, 8192);
                 if ($contents === false) {
-                    throw new Exception('Read an SFTP stream but failed');
+                    throw new ArkSFTPException("Read an SFTP stream but failed from remote [$remotePath] to local [$localPath]");
                 }
                 if (strlen($contents) === 0) {
                     if ($waitForEOFLimitTime > 0) {
@@ -157,14 +157,12 @@ class ArkSFTP
                 }
                 $partialWritten = fwrite($localFile, $contents);
                 if ($partialWritten === false) {
-                    throw new Exception("Failed in writing partial data into local path");
+                    throw new ArkSFTPException("Failed in writing partial data into local path");
                 }
                 if ($partialWritten === 0) {
-                    throw new Exception("Tried to write partial data into local path but none written");
+                    throw new ArkSFTPException("Tried to write partial data into local path but none written");
                 }
             }
-        } catch (Exception $exception) {
-            throw $exception;
         } finally {
             fclose($sftpStream);
             fclose($localFile);
@@ -176,13 +174,13 @@ class ArkSFTP
     /**
      * @param string $remoteDir
      * @param callable $callback function(ArkSFTP $sftp,string $remoteParentDir,string $remoteTargetItem,bool $isDir):void throws \Exception
-     * @throws Exception
+     * @throws ArkSFTPException
      */
-    public function traversalOnRemoteDirectory(string $remoteDir, $callback)
+    public function traversalOnRemoteDirectory(string $remoteDir, callable $callback)
     {
-        $handler = opendir('ssh2.sftp://' . intval($this->sftpConnection) . $remoteDir);
+        $handler = @opendir('ssh2.sftp://' . intval($this->sftpConnection) . $remoteDir);
         if (!$handler) {
-            throw new Exception("Cannot open remote directory");
+            throw new ArkSFTPException("Cannot open remote directory: " . $remoteDir);
         }
 
         while ((($file_name = readdir($handler)) !== false)) {
@@ -202,14 +200,14 @@ class ArkSFTP
 //            }
         }
 
-        closedir($handler);
+        @closedir($handler);
     }
 
     /**
      * @param string $remotePath
      * @return array
      */
-    public function getRemoteFileState(string $remotePath)
+    public function getRemoteFileState(string $remotePath): array
     {
         return ssh2_sftp_stat($this->sftpConnection, $remotePath);
     }
@@ -219,7 +217,7 @@ class ArkSFTP
      * @param string $remotePath Path to the remote symbolic link.
      * @return array
      */
-    public function getRemoteSymlinkState(string $remotePath)
+    public function getRemoteSymlinkState(string $remotePath): array
     {
         return ssh2_sftp_lstat($this->sftpConnection, $remotePath);
     }
@@ -229,7 +227,7 @@ class ArkSFTP
      * @param int $mode
      * @return bool
      */
-    public function changeModeOfRemoteItem($remotePath, $mode)
+    public function changeModeOfRemoteItem(string $remotePath, int $mode): bool
     {
         return ssh2_sftp_chmod($this->sftpConnection, $remotePath, $mode);
     }
@@ -238,7 +236,7 @@ class ArkSFTP
      * @param string $remotePath
      * @return bool
      */
-    public function removeRemoteFile(string $remotePath)
+    public function removeRemoteFile(string $remotePath): bool
     {
         return ssh2_sftp_unlink($this->sftpConnection, $remotePath);
     }
@@ -247,7 +245,7 @@ class ArkSFTP
      * @param string $remotePath
      * @return bool
      */
-    public function removeRemoteDir(string $remotePath)
+    public function removeRemoteDir(string $remotePath): bool
     {
         return ssh2_sftp_rmdir($this->sftpConnection, $remotePath);
     }
@@ -257,7 +255,7 @@ class ArkSFTP
      * @param string $to
      * @return bool
      */
-    public function renameRemoteItem(string $from, string $to)
+    public function renameRemoteItem(string $from, string $to): bool
     {
         return ssh2_sftp_rename($this->sftpConnection, $from, $to);
     }
@@ -267,7 +265,7 @@ class ArkSFTP
      * @param string $remotePath
      * @return string
      */
-    public function getRealPathOfRemoteFile(string $remotePath)
+    public function getRealPathOfRemoteFile(string $remotePath): string
     {
         return ssh2_sftp_realpath($this->sftpConnection, $remotePath);
     }
@@ -276,7 +274,7 @@ class ArkSFTP
      * @param string $remoteLink
      * @return string
      */
-    public function getSymlinkTarget(string $remoteLink)
+    public function getSymlinkTarget(string $remoteLink): string
     {
         return ssh2_sftp_readlink($this->sftpConnection, $remoteLink);
     }
@@ -287,7 +285,7 @@ class ArkSFTP
      * @param string $link
      * @return bool
      */
-    public function createRemoteSymlink(string $target, string $link)
+    public function createRemoteSymlink(string $target, string $link): bool
     {
         return ssh2_sftp_symlink($this->sftpConnection, $target, $link);
     }
@@ -298,7 +296,7 @@ class ArkSFTP
      * @param bool $recursive
      * @return bool
      */
-    public function createRemoteDirectory(string $dirname, int $mode = 0777, bool $recursive = false)
+    public function createRemoteDirectory(string $dirname, int $mode = 0777, bool $recursive = false): bool
     {
         return ssh2_sftp_mkdir($this->sftpConnection, $dirname, $mode, $recursive);
     }
