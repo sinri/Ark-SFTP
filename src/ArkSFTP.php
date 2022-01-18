@@ -205,9 +205,9 @@ class ArkSFTP
 
     /**
      * @param string $remotePath
-     * @return array
+     * @return array|false
      */
-    public function getRemoteFileState(string $remotePath): array
+    public function getRemoteFileState(string $remotePath)
     {
         return ssh2_sftp_stat($this->sftpConnection, $remotePath);
     }
